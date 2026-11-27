@@ -4,9 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>家庭保修管家 · 家庭售后决策助手</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@600;700;900&family=Noto+Sans+SC:wght@400;500;700&family=IBM+Plex+Mono:wght@500;600&family=Inter:wght@500;700;800&display=swap" rel="stylesheet">
 <style>
 /* ============================================================
    家庭保修管家 · 设计系统 V2.0（GPT 共同设计，品牌方向 A「家庭售后档案馆」）
@@ -68,7 +65,7 @@
   --sh-pop:0 12px 40px rgba(31,35,41,.16);
   --focus:#1677FF;
   --header-h:64px;
-  --font-serif:"Noto Serif SC","Songti SC","STSong",serif;
+  --font-serif:"Songti SC","STSong","Noto Serif SC","SimSun",serif;
   --font-num:"Inter",-apple-system,"PingFang SC",sans-serif;
   --font-mono:"IBM Plex Mono","SF Mono",Menlo,monospace;
 }
@@ -248,7 +245,7 @@ table.kv{width:100%; border-collapse:collapse; font-size:14px;}
 table.kv td{padding:6px; border-bottom:1px dashed var(--line); vertical-align:top;}
 table.kv tr:last-child td{border-bottom:0;}
 table.kv td.k{width:96px; color:var(--ink3); font-size:13px;}
-.timeline{border-left:2px solid var(--line); margin:8px 0 0 6px; padding-left:15px;}
+.timeline{border-left:2px solid var(--line2); margin:8px 0 0 6px; padding-left:15px;}
 .timeline .ev{margin-bottom:11px; font-size:14px; position:relative;}
 .timeline .ev::before{content:""; position:absolute; left:-20.5px; top:7px; width:7px; height:7px; border-radius:50%; background:var(--action); border:2px solid var(--surface);}
 .timeline .ev .d{color:var(--ink3); font-size:12.5px; font-variant-numeric:tabular-nums;}
@@ -267,6 +264,11 @@ a{color:var(--action);}
 .banner{display:flex; gap:9px; background:var(--action-soft); border:1px solid var(--banner-line); color:var(--banner-ink);
   border-radius:var(--r-md); padding:10px 13px; font-size:13.5px; margin-bottom:12px; align-items:flex-start;}
 .banner .ic{color:var(--action); margin-top:2px;}
+/* GPT 补审 10：提醒页小标题＋蓝色系统说明框压缩（上下内边距收紧、标题 13px、正文 12px，内容不删） */
+.rem-head{font-size:13.5px; font-weight:700; color:var(--ink); letter-spacing:.3px; margin:0 2px 10px;}
+#view-reminders .banner{padding:7px 13px; font-size:12px; line-height:1.55;}
+#view-reminders .banner strong{font-size:13px;}
+#view-reminders .banner .ic{margin-top:1px;}
 
 /* ---------- v1.2：宽布局 / 概览首屏 / 档案墙 / 结论卡风险区与证据链 ---------- */
 .brand-row,.tabs-in{max-width:1240px;}
@@ -395,7 +397,7 @@ main{max-width:1240px; padding:16px 16px 96px;}
 .cc-tl-track{position:relative; height:4px; border-radius:2px; background:rgba(245,235,215,.18);}
 .cc-tl-fill{position:absolute; left:0; top:0; bottom:0; border-radius:2px; background:var(--bronze);}
 .cc-tl-dot{position:absolute; top:50%; width:11px; height:11px; border-radius:50%; transform:translate(-50%,-50%); background:var(--on-dark); border:2.5px solid var(--bronze);}
-.cc-tl-dot.today{background:var(--bronze); border-color:var(--on-dark);}
+.cc-tl-dot.today{background:#79B8FF; border-color:#79B8FF;}
 .cc-tl-labels{position:relative; height:16px; margin-top:8px; font-size:11px; color:rgba(217,198,165,.85); font-variant-numeric:tabular-nums;}
 /* V2.1 查杀·P2：窄屏下「今天」与「起算」标签位置接近时用深色光晕隔开，避免字形交叠（纯视觉，不动时间线计算） */
 .cc-tl-labels span{position:absolute; top:0; transform:translateX(-50%); white-space:nowrap; text-shadow:0 0 3px #241A10,0 0 5px #241A10,0 0 5px #241A10;}
@@ -602,6 +604,10 @@ table.kv td{padding:9px 6px; border-bottom:1px solid var(--line);}
 .concl-btns .cb-pkg{background:#fff; border-color:var(--action); color:var(--action);}
 .concl-btns .cb-sec{background:var(--surface-warm); border-color:var(--line); color:var(--ink2);}
 .concl-btns .cb-sec:hover{background:#EEF1F5; color:var(--ink);}
+/* 评委动线猎杀 P0-1：对话气泡内嵌结论卡比整页卡窄——按钮行作为纵向 flex 子项会被
+   nowrap 按钮的 min-content（约 250px）顶出卡片右界。只在气泡内放行换行＋取消行级
+   最小宽度，按钮保持自然宽度、放不下就换行；详情页同卡排版不受影响。 */
+.msg .conclusion .concl-btns .cb-row{flex-wrap:wrap; min-width:0;}
 /* 第二批：证据结构化呈现——字段行与「查看完整记录」展开区（核验记录/证据材料共用） */
 .chk-block{border-top:1px dashed var(--line); padding:10px 0 4px;}
 .chk-block:first-of-type{border-top:0; padding-top:2px;}
@@ -1155,7 +1161,7 @@ function buildConclusion(product, ctx, today){
   const basisParts = [];
   if(w.startWhole) basisParts.push('起算日 '+w.startWhole+'（'+(product.start_basis||'购买日')+'）'+startBasisNote(product));
   if(w.wholeBasis && w.wholeBasis.indexOf('换新')===0) basisParts.push('整机按'+w.wholeBasis+'重算');
-  if(!w.missing) basisParts.push('整机保修 '+(product.warranty_months_whole)+' 个月'+(Number(product.extended_months||0)>0 ? '＋延保 '+product.extended_months+' 个月' : '')+'（来源：'+(product.warranty_source||'用户填写')+'）');
+  if(!w.missing) basisParts.push('整机保修 '+(product.warranty_months_whole)+' 个月'+(Number(product.extended_months||0)>0 ? '＋延保 '+product.extended_months+' 个月' : '')+'（信息来源：'+(product.warranty_source||'用户填写')+'）');
   if(w.endParts) basisParts.push('部件到期按'+(w.partsBasis||'档案部件保修期')+'计算');
   const evidence = [];
   if(product.evidence_desc) evidence.push(product.evidence_desc);
@@ -1966,15 +1972,25 @@ function renderReminders(){
   const el = document.getElementById('remList');
   const rs = store.reminders.slice().sort((a,b)=> (a.state==='待决策'?0:1)-(b.state==='待决策'?0:1));
   if(!rs.length){ el.innerHTML = '<div class="empty"><div class="eic"><svg class="ic"><use href="#i-bell"/></svg></div><div class="et">暂无提醒</div><div class="es">有商品临近过保时，这里会生成待办，并附结论摘要供你决策：立即报修，还是暂不处理。</div></div>'; updateBadge(); return; }
-  el.innerHTML = rs.map(r=>{
+  /* GPT 补审 10：卡片上方小标题，N 为实际待决策数 */
+  const pendingN = rs.filter(r=>r.state==='待决策').length;
+  el.innerHTML = '<div class="rem-head">待处理售后 · '+pendingN+' 项</div>' + rs.map(r=>{
     const p = byId(r.product_id); if(!p) return '';
     const c = conclOf(p);
+    /* 评委动线猎杀 P2-1：档位文案按「是否已进入该档位窗口」表达，避免「触发档位 30 天」
+       与「剩余 8 天」并列被速读成数字打架；提醒生成逻辑（syncReminders）不动 */
+    const tierVal = {'30天':30,'7天':7,'当天':0,'过保7天':-7}[r.tier];
+    const tierTxt = (tierVal!==undefined && typeof c.daysWhole==='number')
+      ? ((c.daysWhole < tierVal || c.daysWhole<=0) ? '已进入提醒期' : '计划提醒：到期前 '+tierVal+' 天')
+      : '触发档位：'+esc(r.tier);
     let actions = '';
     if(r.state==='待决策'){
       actions = '<div class="toolbar">'
         + '<button class="btn primary small" onclick="remRepair(\''+r.id+'\')"><svg class="ic sm"><use href="#i-box"/></svg>立即报修（生成资料包）</button>'
-        + '<button class="btn small" onclick="remDefer(\''+r.id+'\')">暂不处理</button>'
-        + '<button class="btn ghost small" onclick="switchView(\'archive\');openDetail(\''+p.id+'\')">看结论卡</button></div>'
+        + '<button class="btn small" onclick="remDefer(\''+r.id+'\')">暂不处理</button></div>'
+        /* GPT 补审 8：「看结论卡」降为蓝色文字链接＋右箭头（.text-link 热区 44px 高），
+           不占第三个实心按钮位；与上方按钮行的间距由 .toolbar 的 margin-bottom 12px 给出 */
+        + '<div><button type="button" class="text-link" onclick="switchView(\'archive\');openDetail(\''+p.id+'\')">看结论卡<span aria-hidden="true" style="font-size:16px;line-height:1">›</span></button></div>'
         + '<div id="defer-'+r.id+'"></div>';
     } else {
       actions = '<div style="font-size:14px;margin-top:6px">处理决定：<b>'+esc(r.decision||'')+'</b>'
@@ -1986,7 +2002,7 @@ function renderReminders(){
         + (r.follow_log.length ? '<div style="font-size:12.5px;color:var(--ink2)">'+r.follow_log.map(f=>esc(f.at)+' → '+esc(f.result)).join('；')+'</div>' : '');
     }
     return '<div class="card"><div class="prod-head"><div><span class="prod-name">'+esc(p.name)+'</span>'+(p.demo?'<span class="demo-tag">演示数据</span>':'')
-      + '<div class="prod-sub">整机到期 '+esc(r.due_date)+' · 触发档位：'+esc(r.tier)+' · 当前状态：'+c.status+'（剩余 '+c.daysWhole+' 天）</div></div>'
+      + '<div class="prod-sub">整机到期 '+esc(r.due_date)+' · '+tierTxt+' · 当前状态：'+c.status+'（剩余 '+c.daysWhole+' 天）</div></div>'
       + '<span class="pill '+(r.state==='待决策'?'st-临近到期':'st-信息不全')+'">'+r.state+'</span></div>'
       + '<div style="font-size:13.5px;color:var(--ink2)">结论档位 '+c.tier+' '+c.tierLabel+' · 依据：'+esc(c.basis)+'</div>'
       + actions + '</div>';
@@ -2141,6 +2157,14 @@ function saveProductForm(){
   if(data.warranty_months_whole!=='' && !isPosIntMonths(data.warranty_months_whole)){ alert('整机保修月数必须为正整数（如 36），不能填小数'); return; }
   if(data.warranty_months_parts!=='' && !isPosIntMonths(data.warranty_months_parts)){ alert('主要部件保修月数必须为正整数'); return; }
   if(g('extended_months')!=='' && !isNonNegIntMonths(g('extended_months'))){ alert('延保月数必须为非负整数（无延保填 0）'); return; }
+  /* 输入校验（评委动线猎杀 P1-2）：购买日期须落在合理区间——未来日期会算出天文数字
+     结论、过早多为年份填错；留空仍按原设计走「暂不能判断」，不拦 */
+  if(data.purchase_date && (data.purchase_date < '1970-01-01' || data.purchase_date > todayStr())){ alert('购买日期「'+data.purchase_date+'」超出合理范围：不能晚于今天，也不能早于 1970-01-01，请核对年份是否填错'); return; }
+  /* 输入校验（评委动线猎杀 P1-1）：价格此前零校验，负数/天价会静默入库并原样上屏（如 ¥-500） */
+  if(data.price!==''){
+    const pv = Number(data.price);
+    if(!Number.isFinite(pv) || pv<0 || pv>10000000 || Math.abs(pv*100-Math.round(pv*100))>1e-9){ alert('购买价格须为 0–10,000,000 元之间的数字（最多两位小数），请修正后再保存'); return; }
+  }
   lockProduct = true; /* 校验全过、进入落库：此后重复点击一律忽略 */
   if(pendingEvidence) data.evidence_record = pendingEvidence;
   if(pendingPhoto) data.photo_file_id = pendingPhoto.file_id;
@@ -2158,10 +2182,12 @@ function saveProductForm(){
     if(pendingPhoto){ p.photo_invalid = false;
       if(oldPhotoId && oldPhotoId !== pendingPhoto.file_id && fileSafeToDelete(oldPhotoId, editingId)) idbDeleteFile(oldPhotoId).catch(()=>{}); }
   } else {
-    store.products.push(Object.assign({id:uid(), source:'手动表单', conflict:false, conflict_desc:'', correction_log:[], demo:false, created_at:todayStr()}, data));
+    /* 评委动线猎杀 P1-3：演示模式下新建的档案与演示数据集同一标记（demo），
+       卡片/详情/结论卡自动带「演示数据」标签，退出演示随演示集一并清除 */
+    store.products.push(Object.assign({id:uid(), source:'手动表单', conflict:false, conflict_desc:'', correction_log:[], demo:demoMode, created_at:todayStr()}, data));
   }
   save(); closeModal('productModal'); syncReminders(); renderAll();
-  toast(editingId ? '档案已更新' : '已建档');
+  toast(editingId ? '档案已更新' : (demoMode ? '已建档（演示数据，退出演示将一并清除）' : '已建档'));
   if(document.getElementById('view-archive').classList.contains('active') && editingId) openDetail(editingId);
   editingId = null;
 }
@@ -2293,7 +2319,7 @@ function confirmRecog(){
   if(dup && !confirm('发现疑似重复档案（同名同品牌同购买日期），仍要另存一份吗？')) return;
   if(recogCtx && recogCtx._submitted) return; /* V2.1：同一张识别确认单只许提交一次，新会话（新 recogCtx）天然放行 */
   if(recogCtx) recogCtx._submitted = true;
-  const p = Object.assign({id:uid(), source:'凭证识别', evidence_desc:recogCtx.evidence, conflict:false, conflict_desc:'', correction_log:[], demo:false, created_at:todayStr()}, data);
+  const p = Object.assign({id:uid(), source:'凭证识别', evidence_desc:recogCtx.evidence, conflict:false, conflict_desc:'', correction_log:[], demo:demoMode, created_at:todayStr()}, data);
   /* 真实 AI 识别建档 → 落完整 vision 追溯记录作为升档证据（v1.5）：原图引用＋哈希＋模型＋
      精确时间＋识别原文＋原值/终值/被改字段；原图未存证成功时 buildVisionRecord 返回 null、不落记录。
      模拟识别只留流程记录（界面全程标注模拟），不生成任何证据记录。 */
@@ -2304,7 +2330,7 @@ function confirmRecog(){
       fields_edited: diffEditedFields(recogCtx.fieldsRaw||{}, data) });
   }
   store.products.push(p); save(); closeModal('recogModal'); syncReminders(); renderAll();
-  botSay('已建档：'+p.name+'。当前结论是「'+conclOf(p).tierLabel+'」档——'+(p.evidence_record ? '依据是凭证，还没和官方政策核对过。' : '依据是你确认录入的信息（本次未生成凭证记录），还没和官方政策核对过。')+'\n想把结论升到「已核实」，可以在档案详情里点「核验保修政策」，照着官方入口查到期限回填即可。');
+  botSay('已建档：'+p.name+'。当前结论是「'+conclOf(p).tierLabel+'」档——'+(p.evidence_record ? '依据是凭证，还没和官方政策核对过。' : '依据是你确认录入的信息（本次未生成凭证记录），还没和官方政策核对过。')+'\n想把结论升到「已核实」，可以在档案详情里点「核验保修政策」，照着官方入口查到期限回填即可。'+(demoMode ? '\n（演示数据，退出演示将一并清除）' : ''));
   switchView('chat');
 }
 
