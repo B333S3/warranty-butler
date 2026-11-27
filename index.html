@@ -1743,7 +1743,7 @@ function renderHome(){
     + '<button class="quick" onclick="switchView(\'archive\');openRecog()"><span class="q-ic"><svg class="ic"><use href="#i-camera"/></svg></span><span><span class="q-t">拍凭证建档</span><br><span class="q-s">订单/发票/保修卡识别</span></span></button>'
     + '<button class="quick" onclick="switchView(\'chat\')"><span class="q-ic"><svg class="ic"><use href="#i-chat"/></svg></span><span><span class="q-t">问管家</span><br><span class="q-s">还保修吗，它直接答</span></span></button>'
     + '<button class="quick" onclick="switchView(\'reminders\')"><span class="q-ic"><svg class="ic"><use href="#i-bell"/></svg></span><span><span class="q-t">提醒中心</span><br><span class="q-s">临期处置闭环</span></span></button>'
-    + '<button class="quick" onclick="openSettings()"><span class="q-ic"><svg class="ic"><use href="#i-gear"/></svg></span><span><span class="q-t">AI 设置</span><br><span class="q-s">填 Key 开真实 AI</span></span></button>'
+    + '<button class="quick" onclick="openSettings()"><span class="q-ic"><svg class="ic"><use href="#i-gear"/></svg></span><span><span class="q-t">AI 设置</span><br><span class="q-s">自填 Key · 高级选项</span></span></button>'
     + '</div>';
   wrap.innerHTML = html;
   hydratePhotos(wrap);
@@ -2251,15 +2251,11 @@ function openRecog(){
   recogSeq++;
   recogCtx = null;
   lockRecog = false;
-  const aiOn = aiConfigured();
   document.getElementById('recogBody').innerHTML =
-    (aiOn
-      ? '<div class="hint"><strong>真实 AI 识别已开启</strong>（豆包视觉）：上传订单/发票/保修卡/铭牌照片，AI 提取字段后由你逐项确认才建档；识别不出的字段会留空，绝不猜测。</div>'
-        + '<div class="frow"><label>上传凭证图片（真实识别）</label><input type="file" accept="image/*" onchange="recogUploadAI(this)"></div>'
-        + '<div id="recogPreview"></div>'
-      : '<div class="hint">未配置 AI：当前只能用<strong>模拟识别</strong>演示流程。想用真实识别，请先点右上角设置按钮，填入你自己的火山方舟 API Key。</div>'
-        + '<div class="toolbar"><button class="btn" onclick="openSettings()"><svg class="ic"><use href="#i-gear"/></svg>去配置 AI</button></div>')
-    + '<div class="hint"><b>隐私提示：</b>使用真实 AI 识别时，你上传的票据图片将发送至火山方舟模型服务处理，图片中的订单号、金额、地址等信息会一并传输；介意的话请先给敏感信息打码，或改用手动录入。</div>'
+    ('<div class="hint"><strong>真实 AI 识别已开启</strong>（豆包视觉，经内置 AI 通道）：上传订单/发票/保修卡/铭牌照片，AI 提取字段后由你逐项确认才建档；识别不出的字段会留空，绝不猜测。通道暂时不可用时会有明确提示，可改用下方模拟识别或手动录入。</div>'
+      + '<div class="frow"><label>上传凭证图片（真实识别）</label><input type="file" accept="image/*" onchange="recogUploadAI(this)"></div>'
+      + '<div id="recogPreview"></div>')
+    + '<div class="hint"><b>隐私提示：</b>使用真实 AI 识别时，你上传的票据图片将经本作品的内置 AI 通道发送至火山方舟模型服务处理，图片中的订单号、金额、地址等信息会一并传输；介意的话请先给敏感信息打码，或改用手动录入。</div>'
     + '<div class="hint">模拟识别（演示用）：选择一种凭证类型，查看模拟提取结果（含逐字段置信度）。</div>'
     + '<div class="toolbar">'+Object.keys(RECOG_PRESETS).map(k=>'<button class="btn" onclick="startRecog(\''+k+'\')">'+RECOG_PRESETS[k].label+'</button>').join('')+'</div>'
     + '<div class="actions"><button class="btn ghost" onclick="closeModal(\'recogModal\')">取消</button></div>';
@@ -2311,7 +2307,7 @@ async function runAIExtract(){
        精确识别时间、呈现给用户的识别原值 fieldsRaw；确认建档时再补终值与被改字段清单。 */
     recogCtx = { mode:'ai', evidence:'票据照片（豆包视觉 AI 识别，'+todayStr()+'）', rawText: r.raw_text||'', fileName: recogCtx.fileName||'',
       fileId: recogCtx.fileId||'', fileSha256: recogCtx.fileSha256||'', persistError: recogCtx.persistError||'',
-      model: (aiSettings().endpoint || ''), visionAt: nowStr(), fieldsRaw: Object.assign({}, fields) };
+      model: (aiSettings().endpoint || PROXY_MODEL), visionAt: nowStr(), fieldsRaw: Object.assign({}, fields) };
     renderRecogForm(fields, conf, '真实 AI 识别完成：字段来自豆包视觉模型提取。低置信度字段已标红，请逐项核对修正；<strong>确认后才建档</strong>。');
   }catch(e){
     if(mySeq !== recogSeq) return;
@@ -2619,7 +2615,7 @@ function sendChat(){
       if(i>=0) store.chat[i] = {role:'bot', text:res.text||'', html:res.html||''};
       else store.chat.push({role:'bot', text:res.text||'', html:res.html||''});
       save(); renderChat();
-    }).catch(()=>{ const i = store.chat.indexOf(typingMsg); if(i>=0) store.chat.splice(i,1); save(); botSay('AI 暂时连不上（网络或接口异常），已切换本地规则模式为你解答。'); botReply(text); });
+    }).catch((e)=>{ const i = store.chat.indexOf(typingMsg); if(i>=0) store.chat.splice(i,1); save(); botSay(e && e.userMessage ? e.userMessage : 'AI 暂时连不上（网络或接口异常），已切换本地规则模式为你解答。'); botReply(text); });
   } else setTimeout(()=> botReply(text), 60);
 }
 /* 对话上下文（v1.3）：记住最近聊到的商品，「那它的压缩机呢」这类追问能接住 */
@@ -2696,33 +2692,59 @@ function botReply(text){
   botSay('我主要帮你管保修这件事，可以这样问我：\n· 「冰箱还保修吗」——给结论卡\n· 「哪件快过保了」——按紧急程度列清单\n· 「过保了怎么办」——官方与第三方维修的核实项对比\n· 品牌政策我不凭印象回答，会引导你走官方核验。');
 }
 
-/* ================= AI 引擎（豆包 · 火山方舟，用户自填 Key） =================
+/* ================= AI 引擎（豆包 · 火山方舟，双通道） =================
    红线：一切数字（到期日/剩余天数/档位）由规则引擎算出后写进事实包喂给模型；
    模型只负责理解问题与组织语言，禁止自算日期、禁止编造品牌政策/电话/价格。
-   Key 只存本机 localStorage，成品不内置任何密钥；无 Key/调用失败一律回落本地规则。 */
+   通道（v1.6）：默认走内置 AI 代理（服务端保管 Key，前端不带任何密钥）；
+   用户在设置页自填 Key+接入点（高级选项）时改走直连，自填 Key 只存本机 localStorage。
+   任一通道调用失败（含代理限流 429）一律回落本地规则，并把服务端人话提示如实展示。 */
 const AI_LS_KEY = 'wb_ai_settings.v1';
 const ARK_URL = 'https://ark.cn-beijing.volces.com/api/v3/chat/completions';
+const PROXY_BASE = 'https://b333s3.duckdns.org:8791';
+const PROXY_MODEL = 'ep-20261118172122-7vzkm'; /* 代理服务端写死的接入点（Doubao-Seed-2.1-pro）；请求体带上仅作占位，服务端会覆盖 */
 function aiSettings(){ try{ return JSON.parse(localStorage.getItem(AI_LS_KEY)) || {}; }catch(e){ return {}; } }
-function aiConfigured(){ const s = aiSettings(); return !!(s.key && s.endpoint); }
-async function arkChat(messages, maxTokens){
-  const s = aiSettings();
-  const resp = await fetch(ARK_URL, { method:'POST',
-    headers:{'Content-Type':'application/json','Authorization':'Bearer '+s.key},
-    body: JSON.stringify({ model:s.endpoint, messages, max_tokens:maxTokens||800, temperature:0.3, thinking:{type:'disabled'} }) });
-  if(!resp.ok) throw new Error('火山方舟接口返回 HTTP '+resp.status);
-  const data = await resp.json();
+function aiDirectConfigured(){ const s = aiSettings(); return !!(s.key && s.endpoint); }
+/* 真实 AI 是否可用：内置代理是默认通道、开箱可用；填了自填 Key 则走直连。
+   通道实际不可达/被限流时，由各调用点的失败回落逻辑切本地规则模式。 */
+function aiConfigured(){ return true; }
+function arkContentOf(data){
   const content = data && data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content;
   if(!content) throw new Error('模型返回为空');
   return content;
 }
+async function arkChat(messages, maxTokens){
+  const s = aiSettings();
+  if(s.key && s.endpoint){
+    /* 高级选项：用户自填 Key 直连火山方舟 */
+    const resp = await fetch(ARK_URL, { method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+s.key},
+      body: JSON.stringify({ model:s.endpoint, messages, max_tokens:maxTokens||800, temperature:0.3, thinking:{type:'disabled'} }) });
+    if(!resp.ok) throw new Error('火山方舟接口返回 HTTP '+resp.status);
+    return arkContentOf(await resp.json());
+  }
+  /* 默认通道：内置 AI 代理——不带 Authorization 头；带图走识别口、纯文本走对话口（代理协议） */
+  const hasImage = messages.some(m=> Array.isArray(m.content) && m.content.some(part=> part && part.type==='image_url'));
+  const resp = await fetch(PROXY_BASE + (hasImage ? '/wb/recognize' : '/wb/chat'), { method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ model:PROXY_MODEL, messages, max_tokens:maxTokens||800, temperature:0.3, thinking:{type:'disabled'} }) });
+  if(!resp.ok){
+    let serverMsg = '';
+    try{ const j = await resp.json(); if(j && j.message) serverMsg = String(j.message); }catch(e){}
+    const err = new Error(serverMsg || ('AI 通道返回 HTTP '+resp.status));
+    err.userMessage = serverMsg; /* 代理返回的人话提示（如限流说明），调用方优先原样展示 */
+    err.httpStatus = resp.status;
+    throw err;
+  }
+  return arkContentOf(await resp.json());
+}
 function openSettings(){
   const s = aiSettings();
   document.getElementById('settingsBody').innerHTML =
-    '<div class="hint">接入后，对话与票据识别使用<strong>真实 AI</strong>（豆包大模型，火山方舟）。数字仍由本应用规则引擎计算，模型只负责理解与表达，不会自己算日期、不会编造品牌政策。<br>API Key 只保存在<strong>本机浏览器</strong>，请求直连火山方舟官方接口，不经过任何第三方。未配置时使用本地规则问答与模拟识别，并如实标注。</div>'
+    '<div class="hint">本应用默认已接入<strong>真实 AI</strong>（豆包大模型，火山方舟，经内置 AI 通道调用），对话与票据识别开箱可用；通道不可用时自动回落本地规则模式，并如实提示。数字仍由本应用规则引擎计算，模型只负责理解与表达，不会自己算日期、不会编造品牌政策。<br><strong>高级选项：</strong>也可以填入你自己的火山方舟 API Key 与接入点，改走你的 Key 直连；自填 Key 只保存在<strong>本机浏览器</strong>。</div>'
     + '<div class="warnbox"><b>Key 安全说明：</b>API Key 只保存在本机浏览器的 localStorage 里，<b>不是保险箱</b>——能打开这台设备浏览器的人可能看到它。请勿在公共电脑或他人设备上保存 Key；不再使用时，点下方「一键清除」立即抹除本机保存的 Key 与接入点。</div>'
     + '<div class="frow"><label>火山方舟 API Key</label><input id="set-key" type="password" autocomplete="off" placeholder="粘贴你的 Ark API Key" value="'+esc(s.key||'')+'"></div>'
     + '<div class="frow"><label>模型接入点 ID（Endpoint）</label><input id="set-endpoint" placeholder="如 ep-xxxxxxxxxxxxxxxx" value="'+esc(s.endpoint||'')+'"></div>'
-    + '<div id="setStatus" style="font-size:13px;color:var(--ink2);margin-bottom:6px">'+(aiConfigured()?'当前状态：已配置，对话与识别将走真实 AI。':'当前状态：未配置，使用本地规则模式。')+'</div>'
+    + '<div id="setStatus" style="font-size:13px;color:var(--ink2);margin-bottom:6px">'+(aiDirectConfigured()?'当前状态：已启用自填 Key 直连，对话与识别走你的火山方舟接口。':'当前状态：使用内置 AI 通道（默认），对话与识别走真实 AI；通道不可用时回落本地规则模式。')+'</div>'
     + '<div class="actions"><button class="btn ghost" onclick="clearAISettings()">一键清除</button>'
     + '<button class="btn" onclick="testAISettings()">保存并测试连接</button>'
     + '<button class="btn primary" onclick="saveAISettings(true)">保存</button></div>';
@@ -2735,18 +2757,18 @@ function saveAISettings(close){
   const s = readAIForm();
   if(s.key || s.endpoint) localStorage.setItem(AI_LS_KEY, JSON.stringify(s));
   else localStorage.removeItem(AI_LS_KEY);
-  if(close){ closeModal('settingsModal'); botSay(aiConfigured() ? 'AI 已接入：现在对话会由豆包大模型结合你的档案事实来回答，拍凭证也会走真实识别。数字仍由规则引擎计算，放心。' : '已保存。AI 还未配置完整（需要 API Key 与接入点 ID），继续使用本地规则模式。'); switchView('chat'); }
+  if(close){ closeModal('settingsModal'); botSay(aiDirectConfigured() ? 'AI 已接入（自填 Key 直连）：现在对话会由豆包大模型结合你的档案事实来回答，拍凭证也会走真实识别。数字仍由规则引擎计算，放心。' : '已保存。对话与识别继续使用内置 AI 通道（真实 AI），通道不可用时自动回落本地规则模式。'); switchView('chat'); }
 }
 function clearAISettings(){ localStorage.removeItem(AI_LS_KEY); openSettings(); }
 async function testAISettings(){
   saveAISettings(false);
   const st = document.getElementById('setStatus');
-  if(!aiConfigured()){ st.textContent = '请先填入 API Key 与接入点 ID。'; return; }
-  st.textContent = '正在测试连接…';
+  const direct = aiDirectConfigured();
+  st.textContent = direct ? '正在测试自填 Key 直连…' : '正在测试内置 AI 通道…';
   try{
     const r = await arkChat([{role:'user', content:'回复两个字：在吗'}], 50);
     st.textContent = '连接成功，模型回复：「'+r.trim().slice(0,30)+'」。可以关闭设置开始使用了。';
-  }catch(e){ st.textContent = '连接失败：'+e.message+'。请检查 Key 与接入点 ID 是否正确。'; }
+  }catch(e){ st.textContent = '连接失败：'+((e && e.userMessage) || e.message)+'。'+(direct ? '请检查 Key 与接入点 ID 是否正确。' : '内置通道暂时不可用，实际使用时会自动回落本地规则模式。'); }
 }
 /* 事实包：规则引擎算好全部数字，模型只能引用，不许自算 */
 function buildFactsPack(){
