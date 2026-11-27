@@ -1557,6 +1557,15 @@ function syncReminders(){
 
 /* ---------- 视图切换 ---------- */
 /* V2.1 任务书：Tab 切换不重载、返回恢复各自滚动位置（详情页由 openDetail 自行回顶） */
+/* 程序化定位必须瞬时完成：全局 smooth 会让 scrollTo 变成动画，动画期间照片异步回填改高页面，
+   iOS Safari 会中断动画把页面留在底部（2026-11-27 杨宇真机报障：点首页被拉到最底下） */
+function jumpTo(y){
+  const de = document.documentElement;
+  const prev = de.style.scrollBehavior;
+  de.style.scrollBehavior = 'auto';
+  window.scrollTo(0, y);
+  de.style.scrollBehavior = prev;
+}
 const scrollMem = {};
 let curView = 'home';
 function switchView(v){
@@ -1571,7 +1580,7 @@ function switchView(v){
   if(v==='archive'){ document.getElementById('archiveListWrap').style.display=''; document.getElementById('archiveDetailWrap').style.display='none'; renderList(); }
   if(v==='reminders') renderReminders();
   curView = v;
-  window.scrollTo(0, scrollMem[v] || 0);
+  jumpTo(scrollMem[v] || 0);
 }
 function renderAll(){ renderHome(); renderList(); renderReminders(); updateBadge(); renderChips(); syncDemoToggle(); }
 function goDetail(pid){ switchView('archive'); openDetail(pid); }
@@ -1913,7 +1922,7 @@ function openDetail(pid){
   hydratePhotos(wrap);
   fixCcTlLabels(wrap);
   document.getElementById('archiveListWrap').style.display='none';
-  window.scrollTo(0,0);
+  jumpTo(0);
 }
 function backToList(){ document.getElementById('archiveDetailWrap').style.display='none'; document.getElementById('archiveListWrap').style.display=''; renderList(); }
 function delProduct(pid){
@@ -2524,7 +2533,7 @@ function renderChat(){
   }).join('');
   fixCcTlLabels(el);
   el.scrollTop = el.scrollHeight;
-  window.scrollTo(0, document.body.scrollHeight);
+  if(curView==='chat') jumpTo(document.body.scrollHeight); /* 仅对话页在前台时才把窗口拉到底；初始化在首页调用时不许劫持首页滚动 */
 }
 function botSay(text, html){ pushMsg('bot', text, html); }
 function findProduct(text){
