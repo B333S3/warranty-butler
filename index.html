@@ -409,6 +409,10 @@ main{max-width:1240px; padding:16px 16px 96px;}
    （fixCcTlLabels 渲染后实测判定，纯标签层排版，不动节点位置与日期计算） */
 .cc-tl-labels.stagger{height:33px;}
 .cc-tl-labels span.st-row2{top:17px;}
+/* GPT 终审 P1：节点错层（fixCcTlLabels 实测横距 <12px 时加类）——横坐标不动，
+   今天点上移、到期点下移，两点圆心竖距约 19px，彻底分开；颜色沿用既有（今天蓝、到期金边） */
+.cc-timeline.dots-stagger .cc-tl-dot[data-k="today"]{transform:translate(-50%,-135%);}
+.cc-timeline.dots-stagger .cc-tl-dot[data-k="end"]{transform:translate(-50%,35%);}
 .concl-sec{display:flex; gap:13px; padding:14px 18px 6px;}
 .concl-sec .sec-no{font-family:var(--font-mono); font-size:13px; font-weight:600; color:var(--bronze); border:1px solid var(--line2);
   border-radius:8px; width:34px; height:26px; flex:none; display:grid; place-items:center; background:var(--surface-warm); margin-top:1px;}
@@ -608,6 +612,10 @@ table.kv td{padding:9px 6px; border-bottom:1px solid var(--line);}
    nowrap 按钮的 min-content（约 250px）顶出卡片右界。只在气泡内放行换行＋取消行级
    最小宽度，按钮保持自然宽度、放不下就换行；详情页同卡排版不受影响。 */
 .msg .conclusion .concl-btns .cb-row{flex-wrap:wrap; min-width:0;}
+/* GPT 终审 P2：气泡内次行三钮统一半行宽——换行后的第三钮不再整行拉满，
+   与前两钮同高（44px 由 .concl-btns .btn 的 min-height 保证）、同圆角、同宽、左对齐；
+   详情页同卡排版（flex:1 三等分）不受此规则影响。 */
+.msg .conclusion .concl-btns .cb-row.sub .btn{flex:0 1 calc(50% - 4px);}
 /* 第二批：证据结构化呈现——字段行与「查看完整记录」展开区（核验记录/证据材料共用） */
 .chk-block{border-top:1px dashed var(--line); padding:10px 0 4px;}
 .chk-block:first-of-type{border-top:0; padding-top:2px;}
@@ -728,7 +736,7 @@ table.kv td{padding:9px 6px; border-bottom:1px solid var(--line);}
 
   <!-- 提醒视图 -->
   <section id="view-reminders" class="view" aria-label="提醒中心">
-    <div class="banner"><svg class="ic"><use href="#i-bell"/></svg><span>这里是<strong>应用内提醒</strong>：本应用不发送系统推送通知，请在打开应用时查看本页与到期横幅。</span></div>
+    <div class="banner"><svg class="ic"><use href="#i-bell"/></svg><span>本应用暂不发送系统通知，请打开应用查看待处理售后和首页到期提醒。</span></div>
     <div id="remList"></div>
   </section>
 </main>
@@ -809,9 +817,15 @@ function isValidDateStr(s){
   return dt.getFullYear()===y && dt.getMonth()===mo-1 && dt.getDate()===d;
 }
 function parseDate(s){ if(!isValidDateStr(s)) return null; const p=String(s).trim().split('-').map(Number); return new Date(p[0],p[1]-1,p[2]); }
-/* 月数严格校验（v1.3）：保修月数必须为正整数，延保月数为非负整数，1.5 个月这种输入直接判无效。 */
-function isPosIntMonths(v){ if(v===''||v===null||v===undefined) return false; const n=Number(v); return Number.isInteger(n) && n>0; }
-function isNonNegIntMonths(v){ if(v===''||v===null||v===undefined) return false; const n=Number(v); return Number.isInteger(n) && n>=0; }
+/* 日期合理区间（终检猎杀）：真实事件日期不能晚于今天、不能早于 1970-01-01。
+   起算依据可落在购买/发票/激活任一日期上——只拦购买日期会留侧门（发票日填 2999 同样算出天文数字结论）。 */
+function dateOutOfRange(s){ return !!s && isValidDateStr(s) && (s < '1970-01-01' || s > todayStr()); }
+/* 月数严格校验（v1.3）：保修月数必须为正整数，延保月数为非负整数，1.5 个月这种输入直接判无效。
+   终检猎杀补上限：月数 >1200（100 年）一律判无效——超长月数会把到期年算成 5 位数，
+   严格日期格式拒收后天数退化成与真实日期无关的垃圾值（实测「已过保 20784 天」），
+   或算出数十万天级天文数字；真实保修无此量级。 */
+function isPosIntMonths(v){ if(v===''||v===null||v===undefined) return false; const n=Number(v); return Number.isInteger(n) && n>0 && n<=1200; }
+function isNonNegIntMonths(v){ if(v===''||v===null||v===undefined) return false; const n=Number(v); return Number.isInteger(n) && n>=0 && n<=1200; /* 上限同 isPosIntMonths：延保叠加同样能算出 5 位年份与垃圾天数 */ }
 /* 商品数据体检：分清「缺失」（补齐即可）与「无效」（填了但不合法，必须修正）。
    无效数据 → 信息不全/待修正，不许继续出正式结论（v1.3）。 */
 function productDataIssues(product){
@@ -1019,6 +1033,19 @@ function fixCcTlLabels(root){
     const GAP = 4;
     const r0 = spans[0].getBoundingClientRect(), r1 = mid.getBoundingClientRect(), r2 = spans[2].getBoundingClientRect();
     const bx = box.getBoundingClientRect();
+    /* GPT 终审 P1：节点级防撞——标签错层只管文字，「今天」与「到期」两节点圆点横距 <12px
+       时圆点本身几乎贴合。保持横坐标与真实时间比例不变，两点上下错层（今天蓝点上移、
+       到期金点下移），与下方标签错层独立判定、可同时生效。 */
+    const tl = box.closest ? box.closest('.cc-timeline') : null;
+    if(tl && tl.querySelector){
+      const dT = tl.querySelector('.cc-tl-dot[data-k="today"]');
+      const dE = tl.querySelector('.cc-tl-dot[data-k="end"]');
+      if(dT && dE && dT.getBoundingClientRect){
+        const rt = dT.getBoundingClientRect(), re = dE.getBoundingClientRect();
+        const dx = Math.abs((rt.left + rt.width/2) - (re.left + re.width/2));
+        tl.classList.toggle('dots-stagger', dx < 12);
+      }
+    }
     const crowded = r1.left < r0.right + GAP || r1.right > r2.left - GAP || r1.left < bx.left || r1.right > bx.right;
     if(!crowded) return;
     box.classList.add('stagger');
@@ -1052,7 +1079,7 @@ function validPartEvent(e, product){
   if(product && product.id && e.product_id && e.product_id!==product.id) return false;
   if(!e.start_date || !parseDate(e.start_date)) return false;
   const m = Number(e.months);
-  return Number.isInteger(m) && m>0;
+  return Number.isInteger(m) && m>0 && m<=1200; /* 与 isPosIntMonths 同上限：超长月数算出 5 位年份 → 天数退化成垃圾值 */
 }
 /* 双轨计算：整机（含延保叠加）与主要部件（部件事件优先，其次档案部件月数）
    到期日口径：起算日 + 保修月数 = 到期日；到期日当天剩余 0 天，仍算在保（临近）。
@@ -1550,7 +1577,9 @@ function syncReminders(){
     if(w.missing || w.daysWhole===null || w.daysWhole>30 || w.daysWhole<-30){ if(ex && ex.state==='待决策') store.reminders = store.reminders.filter(r=>r.id!==id); return; }
     const tier = w.daysWhole>7 ? '30天' : (w.daysWhole>0 ? '7天' : (w.daysWhole===0 ? '当天' : '过保7天'));
     if(!ex) store.reminders.push({id, product_id:p.id, tier, due_date:w.endWhole, state:'待决策', decision:'', defer_reason:'', follow_result:'', follow_log:[]});
-    else if(ex.state==='待决策') ex.tier = tier;
+    /* 终检猎杀：待决策提醒的到期日也要随档案编辑刷新——此前只刷 tier，编辑购买日期后
+       提醒卡会并列显示旧到期日与按新到期算出的剩余天数，自相矛盾 */
+    else if(ex.state==='待决策'){ ex.tier = tier; ex.due_date = w.endWhole; }
   });
   save();
 }
@@ -2013,7 +2042,8 @@ function renderReminders(){
     return '<div class="card"><div class="prod-head"><div><span class="prod-name">'+esc(p.name)+'</span>'+(p.demo?'<span class="demo-tag">演示数据</span>':'')
       + '<div class="prod-sub">整机到期 '+esc(r.due_date)+' · '+tierTxt+' · 当前状态：'+c.status+'（剩余 '+c.daysWhole+' 天）</div></div>'
       + '<span class="pill '+(r.state==='待决策'?'st-临近到期':'st-信息不全')+'">'+r.state+'</span></div>'
-      + '<div style="font-size:13.5px;color:var(--ink2)">结论档位 '+c.tier+' '+c.tierLabel+' · 依据：'+esc(c.basis)+'</div>'
+      + '<div style="font-size:13.5px;color:var(--ink2)">结论档位 '+c.tier+' '+c.tierLabel+'</div>'
+      + '<div style="font-size:13.5px;color:var(--ink2)">计算依据：'+esc(c.basis)+'</div>'
       + actions + '</div>';
   }).join('');
   updateBadge();
@@ -2166,9 +2196,12 @@ function saveProductForm(){
   if(data.warranty_months_whole!=='' && !isPosIntMonths(data.warranty_months_whole)){ alert('整机保修月数必须为正整数（如 36），不能填小数'); return; }
   if(data.warranty_months_parts!=='' && !isPosIntMonths(data.warranty_months_parts)){ alert('主要部件保修月数必须为正整数'); return; }
   if(g('extended_months')!=='' && !isNonNegIntMonths(g('extended_months'))){ alert('延保月数必须为非负整数（无延保填 0）'); return; }
-  /* 输入校验（评委动线猎杀 P1-2）：购买日期须落在合理区间——未来日期会算出天文数字
-     结论、过早多为年份填错；留空仍按原设计走「暂不能判断」，不拦 */
-  if(data.purchase_date && (data.purchase_date < '1970-01-01' || data.purchase_date > todayStr())){ alert('购买日期「'+data.purchase_date+'」超出合理范围：不能晚于今天，也不能早于 1970-01-01，请核对年份是否填错'); return; }
+  /* 输入校验（评委动线猎杀 P1-2＋终检猎杀扩围）：三个日期都须落在合理区间——起算依据
+     可选发票日/激活日，只拦购买日期时，发票日填 2999 同样算出天文数字结论；
+     留空仍按原设计走「暂不能判断」，不拦 */
+  for(const [k,label] of [['purchase_date','购买日期'],['invoice_date','发票日期'],['activation_date','激活日期']]){
+    if(dateOutOfRange(data[k])){ alert(label+'「'+data[k]+'」超出合理范围：不能晚于今天，也不能早于 1970-01-01，请核对年份是否填错'); return; }
+  }
   /* 输入校验（评委动线猎杀 P1-1）：价格此前零校验，负数/天价会静默入库并原样上屏（如 ¥-500） */
   if(data.price!==''){
     const pv = Number(data.price);
@@ -2324,6 +2357,16 @@ function confirmRecog(){
   }
   if(data.warranty_months_whole!=='' && !isPosIntMonths(data.warranty_months_whole)){ alert('整机保修月数必须为正整数，请核对识别结果'); return; }
   if(data.warranty_months_parts!=='' && !isPosIntMonths(data.warranty_months_parts)){ alert('主要部件保修月数必须为正整数，请核对识别结果'); return; }
+  /* 终检猎杀：识别路径此前只验日期格式与月数——价格与日期区间与手动表单同口径补齐。
+     识别误读年份（如 2999）或用户在确认单里改出负价，都会静默入库再算出天文数字/¥-500 */
+  for(const [k,label] of [['purchase_date','购买日期'],['invoice_date','发票日期']]){
+    if(dateOutOfRange(data[k])){ alert(label+'「'+data[k]+'」超出合理范围：不能晚于今天，也不能早于 1970-01-01，请核对年份是否填错'); return; }
+  }
+  if(data.price!==''){
+    const pv = Number(data.price);
+    if(!Number.isFinite(pv) || pv<0 || pv>10000000 || Math.abs(pv*100-Math.round(pv*100))>1e-9){ alert('购买价格须为 0–10,000,000 元之间的数字（最多两位小数），请修正后再保存'); return; }
+  }
+  if(g('extended_months')!=='' && !isNonNegIntMonths(g('extended_months'))){ alert('延保月数必须为非负整数，请核对识别结果'); return; }
   const dup = store.products.find(p=>p.name===data.name && p.brand===data.brand && p.purchase_date===data.purchase_date);
   if(dup && !confirm('发现疑似重复档案（同名同品牌同购买日期），仍要另存一份吗？')) return;
   if(recogCtx && recogCtx._submitted) return; /* V2.1：同一张识别确认单只许提交一次，新会话（新 recogCtx）天然放行 */
@@ -2435,8 +2478,15 @@ function openRepair(pid){
 function saveRepair(){
   const fault = document.getElementById('rp-fault').value.trim();
   if(!fault){ alert('请填写故障描述'); return; }
+  /* 终检猎杀：维修日期与费用此前零校验——未来日期、负费用（¥-500）会静默入库并进资料包 */
+  const rd = document.getElementById('rp-date').value;
+  if(rd && !isValidDateStr(rd)){ alert('维修日期不是真实日期'); return; }
+  if(dateOutOfRange(rd)){ alert('维修日期「'+rd+'」超出合理范围：不能晚于今天，也不能早于 1970-01-01'); return; }
+  const costRaw = document.getElementById('rp-cost').value.trim();
+  const costVal = costRaw==='' ? 0 : Number(costRaw);
+  if(!Number.isFinite(costVal) || costVal<0){ alert('维修费用须为不小于 0 的数字'); return; }
   store.repairs.push({id:uid(), product_id:repairPid, repair_date:document.getElementById('rp-date').value||todayStr(),
-    fault_desc:fault, provider_type:document.getElementById('rp-provider').value, cost:Number(document.getElementById('rp-cost').value||0),
+    fault_desc:fault, provider_type:document.getElementById('rp-provider').value, cost:costVal,
     in_warranty: document.getElementById('rp-inw').value==='1', result:document.getElementById('rp-result').value, note:document.getElementById('rp-note').value.trim()});
   save(); closeModal('repairModal'); if(currentDetail===repairPid) openDetail(repairPid);
   toast('维修记录已保存');
@@ -2468,9 +2518,14 @@ function saveEvent(){
     if(!isPosIntMonths(months)){ alert('部件保修月数必须为正整数，不能填小数'); return; }
     const sd = document.getElementById('ev-start').value;
     if(sd && !isValidDateStr(sd)){ alert('部件起算日期不是真实日期'); return; }
+    if(dateOutOfRange(sd)){ alert('部件起算日期「'+sd+'」超出合理范围：不能晚于今天，也不能早于 1970-01-01'); return; }
     store.partEvents.push({id:uid(), product_id:pid, part_name:part, event_type:document.getElementById('ev-type').value,
       start_date:document.getElementById('ev-start').value||todayStr(), months:Number(months), note:document.getElementById('ev-note').value.trim()});
   } else {
+    /* 终检猎杀：换新日期此前零校验——填 2999 并选整机重算，过期机立刻变「在保 35 万天」 */
+    const ed = document.getElementById('ev-date').value;
+    if(ed && !isValidDateStr(ed)){ alert('换新日期不是真实日期'); return; }
+    if(dateOutOfRange(ed)){ alert('换新日期「'+ed+'」超出合理范围：不能晚于今天，也不能早于 1970-01-01'); return; }
     store.replacements.push({id:uid(), product_id:pid, event_date:document.getElementById('ev-date').value||todayStr(),
       old_serial_no:document.getElementById('ev-old').value.trim(), new_serial_no:document.getElementById('ev-new').value.trim(),
       warranty_reset:document.getElementById('ev-reset').value, note:document.getElementById('ev-note').value.trim()});
