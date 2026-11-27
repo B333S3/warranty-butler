@@ -646,6 +646,53 @@ table.kv td{padding:9px 6px; border-bottom:1px solid var(--line);}
 .risk-row::after{margin-left:6px;}
 /* 第四批：结论卡时间线「今天」标签蓝色强调（只改颜色，不动防撞布局与字重） */
 .cc-tl-labels .mid{color:#79B8FF;}
+
+/* ---------- V2.3 对话页布局修复＋语音输入（杨宇真机报障：空态时输入框悬在页面中部） ----------
+   对话视图改纵向弹性布局：消息区占满剩余高度独立滚动，快捷问与输入框恒贴视图底部；
+   视图高度按断点扣除顶栏/底栏占用，键盘弹起时由 fitChatHeight() 按 visualViewport 动态收紧。
+   main 底内边距在对话页让位（:has），避免整页多出一截可滚空白。只动布局，不动配色与视觉。 */
+#view-chat.active{display:flex; flex-direction:column; height:calc(100dvh - 133px);}
+main:has(> #view-chat.active){padding-bottom:0;}
+#view-chat #chatLog{flex:1 1 auto; min-height:0; overflow-y:auto; overscroll-behavior:contain;
+  -webkit-overflow-scrolling:touch; scrollbar-width:thin;}
+#view-chat .chips{flex:none;}
+#view-chat .chat-input{position:relative; bottom:auto; flex:none; margin-bottom:12px;}
+@media (max-width:760px){
+  #view-chat.active{height:calc(100dvh - 136px - env(safe-area-inset-bottom));}
+  #view-chat .chat-input{margin-bottom:8px;}
+}
+@media (min-width:1200px){
+  #view-chat.active{height:calc(100dvh - 72px);}
+}
+/* 输入框左内边距让位麦克风按钮：按钮隐藏时文字起点与旧版一致（5+11=16px） */
+.chat-input{padding-left:5px;}
+.chat-input input{padding-left:11px;}
+/* 麦克风幽灵按钮：与顶栏设置键同一语言（透明底、灰图标、按压缩放）；识别中红底呼吸光圈示忙 */
+.mic-btn{width:44px; height:44px; border-radius:12px; border:0; flex:none; place-items:center;
+  background:transparent; color:#66717F; cursor:pointer; transition:background .15s,color .15s,transform .1s;}
+.mic-btn:hover{background:var(--action-soft); color:var(--action);}
+.mic-btn:active{transform:scale(.93);}
+.mic-btn .ic{width:20px; height:20px;}
+.mic-btn.rec{background:var(--bad); color:#fff; animation:micPulse 1.3s ease-in-out infinite;}
+.mic-btn.rec:hover{background:var(--bad); color:#fff;}
+@keyframes micPulse{0%,100%{box-shadow:0 0 0 0 rgba(185,67,53,.35);} 50%{box-shadow:0 0 0 7px rgba(185,67,53,0);}}
+/* ---------- Bug2 横向漂移锁（2026-11-27 杨宇真机反馈：弹窗/页面能被手指横向拖着来回漂移） ----------
+   实测定位：Chromium 与 WebKit(MiniBrowser) 在 390/375 下逐个开弹窗量过——静态布局零横向溢出
+   （scrollWidth 恒等于 innerWidth、无越界元素），漂移来自触摸手势层：横向拖动被滚动容器/页面
+   转成了平移与橡皮筋回弹。三重锁：
+   ① 根层 overflow-x:clip —— 裁掉任何横向溢出；clip 不生成滚动容器，不伤 sticky 与 window 滚动；
+   ② touch-action 只放行纵向平移＋捏合缩放 —— 横向手指拖动不再被转成平移；纵向滚动照常。
+      手势判定只走到「实际滚动的元素」为止：快捷条等自有横向滚动容器不受影响；
+   ③ overscroll-behavior 断开横向过滚链，杜绝回弹漂移。
+   弹窗层再叠 overflow-x:hidden 与子项收缩兜底，长串（链接/编号）允许断行。 */
+html{overflow-x:clip; overscroll-behavior-x:none;}
+body{overflow-x:clip; touch-action:pan-y pinch-zoom;}
+#chatLog{touch-action:pan-y pinch-zoom;}
+.modal-mask{overflow-x:hidden; overscroll-behavior:contain; touch-action:pan-y pinch-zoom;}
+.modal{max-width:100%; overflow-x:hidden; touch-action:pan-y pinch-zoom;}
+.modal .frow,.modal .grid2>*{min-width:0;}
+.modal img{max-width:100%;}
+.hint,.warnbox{overflow-wrap:break-word;}
 </style>
 </head>
 <body>
@@ -667,6 +714,7 @@ table.kv td{padding:9px 6px; border-bottom:1px solid var(--line);}
     <symbol id="i-doc" viewBox="0 0 24 24"><path d="M7 3h7l4 4v14H7z"/><path d="M14 3v4h4M10 12h5M10 15.5h5"/></symbol>
     <symbol id="i-alert" viewBox="0 0 24 24"><path d="M12 4L22 20H2z"/><path d="M12 10v4.4M12 17.2v.3"/></symbol>
     <symbol id="i-send" viewBox="0 0 24 24"><path d="M12 19V5M6 10.5L12 4.5l6 6"/></symbol>
+    <symbol id="i-mic" viewBox="0 0 24 24"><path d="M12 2.8a3 3 0 0 1 3 3v5.7a3 3 0 0 1-6 0V5.8a3 3 0 0 1 3-3z"/><path d="M18.6 11.5a6.6 6.6 0 0 1-13.2 0M12 18.1V21M8.8 21h6.4"/></symbol>
     <symbol id="i-back" viewBox="0 0 24 24"><path d="M14.5 5.5L8 12l6.5 6.5"/></symbol>
     <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.6"/><path d="M12 7.5V12l3 2"/></symbol>
     <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.8v3M12 18.2v3M2.8 12h3M18.2 12h3M5.5 5.5l2.1 2.1M16.4 16.4l2.1 2.1M18.5 5.5l-2.1 2.1M7.6 16.4l-2.1 2.1"/></symbol>
@@ -710,6 +758,7 @@ table.kv td{padding:9px 6px; border-bottom:1px solid var(--line);}
     <div id="chatLog"></div>
     <div class="chips" id="chipRow"></div>
     <div class="chat-input">
+      <button class="mic-btn" id="micBtn" onclick="toggleVoice()" aria-label="语音输入" style="display:none"><svg class="ic"><use href="#i-mic"/></svg></button>
       <input id="chatText" aria-label="输入问题" placeholder="问问管家：冰箱还保修吗 / 哪件快过保了…" onkeydown="if(event.key==='Enter')sendChat()">
       <button class="send-btn" onclick="sendChat()" aria-label="发送"><svg class="ic"><use href="#i-send"/></svg></button>
     </div>
@@ -1595,6 +1644,23 @@ function jumpTo(y){
   window.scrollTo(0, y);
   de.style.scrollBehavior = prev;
 }
+/* 对话页高度贴合：视图高度 = 可视区高度 − 视图顶端占用 − 底部固定标签栏高度。
+   CSS 的 dvh 计算是静态基线；键盘弹起时 visualViewport 变小，本函数同步收紧高度，
+   输入框始终贴在可视区底部、标签栏上方（桌面/平板标签栏不在底部，reserve 为 0）。 */
+function fitChatHeight(){
+  try{
+    const vv = window.visualViewport;
+    if(!vv) return;
+    const v = document.getElementById('view-chat');
+    if(!v || !v.classList.contains('active')) return;
+    const tabs = document.querySelector('nav.tabs');
+    let reserve = 0;
+    if(tabs && getComputedStyle(tabs).position === 'fixed') reserve = tabs.getBoundingClientRect().height;
+    const topInView = v.getBoundingClientRect().top - (vv.offsetTop || 0);
+    const h = Math.round(vv.height - topInView - reserve);
+    if(h > 240) v.style.height = h + 'px';
+  }catch(e){}
+}
 const scrollMem = {};
 let curView = 'home';
 function switchView(v){
@@ -1610,6 +1676,7 @@ function switchView(v){
   if(v==='reminders') renderReminders();
   curView = v;
   jumpTo(scrollMem[v] || 0);
+  if(v==='chat'){ fitChatHeight(); setTimeout(fitChatHeight, 280); /* viewIn 动画（translateY 5px）结束后再贴合一次，消除测高偏移 */ }
 }
 function renderAll(){ renderHome(); renderList(); renderReminders(); updateBadge(); renderChips(); syncDemoToggle(); }
 function goDetail(pid){ switchView('archive'); openDetail(pid); }
@@ -2556,25 +2623,89 @@ function copyPkg(){
 </script>
 <script>
 /* ================= 对话（配置 AI 后走豆包大模型＋事实包；否则规则兜底问答） ================= */
-const CHIPS = ['拍凭证建档','冰箱还保修吗','冰箱压缩机坏了还保吗','哪件快过保了','过保了怎么办','我的档案'];
-const CHIP_ICONS = {'拍凭证建档':'#i-camera','冰箱还保修吗':'#i-shield','冰箱压缩机坏了还保吗':'#i-wrench','哪件快过保了':'#i-clock','过保了怎么办':'#i-alert','我的档案':'#i-folder'};
+/* ---------- 快捷问「看状态出牌」：候选池按当前状态生成，每次按优先级＋随机抽 3 条 ----------
+   状态信号全部取自现有数据源（档案/到期/待处理/今日新建/最近结论卡/演示模式），
+   chip 的视觉与点击行为与旧版一致（建档/档案/提醒走动作，其余填入并发送）。 */
+function chipPool(){
+  const pool = [];
+  const add = (label, icon, act)=>{ if(label && !pool.some(c=>c.label===label)) pool.push({label, icon:icon||'#i-chat', act:act||'send'}); };
+  const prods = store.products || [];
+  if(demoMode){ /* 演示模式：引导体验核心功能 */
+    add('冰箱还保修吗','#i-shield');
+    add('冰箱压缩机坏了还保吗','#i-wrench');
+    add('哪件快过保了','#i-clock');
+    add('过保了怎么办','#i-alert');
+    add('我的档案','#i-folder','archive');
+    add('退出演示模式','#i-back','exitDemo');
+    return pool;
+  }
+  if(!prods.length){ /* 档案为空：引导录入 / 试用演示 */
+    add('拍凭证建档','#i-camera','recog');
+    add('先看看演示数据','#i-play','demo');
+    add('手动录入一件','#i-pen','manual');
+    return pool;
+  }
+  const withW = prods.map(p=>({p, w:warrantyOf(p)}));
+  /* 刚出结论卡：给跟进动作（对象＝对话上下文里的那件商品） */
+  const lastCard = [...store.chat].reverse().find(m=>m.role==='bot' && m.html && m.html.includes('conclusion'));
+  const ctxP = chatCtxPid ? byId(chatCtxPid) : null;
+  if(lastCard && ctxP){
+    add('帮我写售后话术','#i-pen');
+    add(ctxP.name+'的主要部件保吗','#i-wrench');
+    add('报修要带什么','#i-doc');
+  }
+  /* 有待处理事项 */
+  if((store.reminders||[]).some(r=>r.state==='待决策')) add('看看待处理事项','#i-bell','reminders');
+  /* 有已过保物品（过保最久的排先） */
+  const over = withW.filter(r=>r.w.daysWhole!==null && r.w.daysWhole<0).sort((a,b)=>a.w.daysWhole-b.w.daysWhole);
+  if(over.length) add(over[0].p.name+'过保了怎么办','#i-alert');
+  /* 有物品 30 天内到期（最近到期的排先） */
+  const near = withW.filter(r=>r.w.daysWhole!==null && r.w.daysWhole>=0 && r.w.daysWhole<=30).sort((a,b)=>a.w.daysWhole-b.w.daysWhole);
+  if(near.length) add(near[0].p.name+'还保修吗','#i-clock');
+  /* 今天刚录入的物品 */
+  const fresh = prods.filter(p=>p.created_at===todayStr());
+  if(fresh.length) add(fresh[fresh.length-1].name+'保修到哪天','#i-shield');
+  /* 通用兜底 */
+  add('哪件快过保了','#i-clock');
+  add('拍凭证建档','#i-camera','recog');
+  add('我的档案','#i-folder','archive');
+  return pool;
+}
+let lastChipKey = '';
+function pickChips(pool){
+  if(pool.length<=3){ lastChipKey = pool.map(c=>c.label).sort().join('|'); return pool.slice(); }
+  const head = pool[0], rest = pool.slice(1);
+  let picks = null, key = '';
+  for(let i=0;i<8;i++){
+    const s = rest.slice();
+    for(let j=s.length-1;j>0;j--){ const k = Math.floor(Math.random()*(j+1)); const t = s[j]; s[j] = s[k]; s[k] = t; }
+    picks = [head, s[0], s[1]];
+    key = picks.map(c=>c.label).sort().join('|');
+    if(key!==lastChipKey) break;
+  }
+  lastChipKey = key;
+  return picks;
+}
 function renderChips(){
-  document.getElementById('chipRow').innerHTML = CHIPS.map(c=>{
-    const label = c.replace(/^[^\u4e00-\u9fa5]+/,'').trim();
-    const ic = CHIP_ICONS[label] || '#i-chat';
-    return '<button class="chip" onclick="chipClick(this)"><svg class="ic"><use href="'+ic+'"/></svg>'+label+'</button>';
-  }).join('');
+  document.getElementById('chipRow').innerHTML = pickChips(chipPool()).map(c=>
+    '<button class="chip" data-act="'+c.act+'" onclick="chipClick(this)"><svg class="ic"><use href="'+c.icon+'"/></svg>'+esc(c.label)+'</button>'
+  ).join('');
 }
 function chipClick(btn){
-  const t = btn.textContent.replace(/^[^\u4e00-\u9fa5]+/,'').trim();
-  if(t==='拍凭证建档'){ openRecog(); return; }
-  if(t==='我的档案'){ switchView('archive'); return; }
+  const act = btn.getAttribute('data-act') || 'send';
+  if(act==='recog'){ openRecog(); return; }
+  if(act==='archive'){ switchView('archive'); return; }
+  if(act==='reminders'){ switchView('reminders'); return; }
+  if(act==='demo'){ enterDemoMode(); return; }
+  if(act==='exitDemo'){ exitDemoMode(); return; }
+  if(act==='manual'){ openProductForm(); return; }
+  const t = btn.textContent.trim();
   document.getElementById('chatText').value = t; sendChat();
 }
 function pushMsg(role, text, html){
   store.chat.push({role, text:text||'', html:html||''});
   if(store.chat.length>60) store.chat = store.chat.slice(-60);
-  save(); renderChat();
+  save(); renderChat(); renderChips();
 }
 function renderChat(){
   const el = document.getElementById('chatLog');
@@ -2617,6 +2748,48 @@ function sendChat(){
       save(); renderChat();
     }).catch((e)=>{ const i = store.chat.indexOf(typingMsg); if(i>=0) store.chat.splice(i,1); save(); botSay(e && e.userMessage ? e.userMessage : 'AI 暂时连不上（网络或接口异常），已切换本地规则模式为你解答。'); botReply(text); });
   } else setTimeout(()=> botReply(text), 60);
+}
+/* ---------- 语音输入（浏览器原生识别，不接任何外部语音服务） ----------
+   仅当浏览器提供 SpeechRecognition 时才显示麦克风按钮（不支持的浏览器按钮恒隐藏）；
+   识别文本实时回填输入框：final 段累积、interim 段跟随刷新；再点一次或自然结束即停。 */
+let voiceRec = null, voiceOn = false;
+function voiceSupported(){ try{ return !!(window.SpeechRecognition || window.webkitSpeechRecognition); }catch(e){ return false; } }
+function initVoiceBtn(){ try{ if(voiceSupported()){ const b = document.getElementById('micBtn'); if(b) b.style.display = 'grid'; } }catch(e){} }
+function voiceUi(on){
+  const b = document.getElementById('micBtn'); if(!b) return;
+  b.classList.toggle('rec', on);
+  b.setAttribute('aria-label', on ? '停止语音输入' : '语音输入');
+}
+function toggleVoice(){
+  if(voiceOn){ try{ if(voiceRec) voiceRec.stop(); }catch(e){} return; }
+  if(!voiceSupported()){ toast('当前浏览器不支持语音输入'); return; }
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  let rec = null;
+  try{ rec = new SR(); }catch(e){ toast('语音输入启动失败，请稍后再试'); return; }
+  voiceRec = rec;
+  rec.lang = 'zh-CN'; rec.interimResults = true; rec.continuous = false;
+  const input = document.getElementById('chatText');
+  const base = input.value;
+  let finalSeg = '';
+  rec.onresult = ev=>{
+    let interim = '';
+    for(let i = ev.resultIndex; i < ev.results.length; i++){
+      const t = ev.results[i][0].transcript;
+      if(ev.results[i].isFinal) finalSeg += t; else interim += t;
+    }
+    input.value = base + finalSeg + interim;
+  };
+  rec.onerror = ev=>{
+    const code = ev && ev.error;
+    if(code === 'not-allowed' || code === 'service-not-allowed') toast('麦克风权限被拒绝，请在浏览器设置中允许麦克风后重试');
+    else if(code === 'no-speech') toast('没有听到声音，请再说一次');
+    else if(code === 'audio-capture') toast('没有找到可用的麦克风');
+    else if(code === 'aborted'){ /* 用户主动停止：不在此报错，onend 统一收尾 */ }
+    else toast('语音识别出错了，请再试一次');
+  };
+  rec.onend = ()=>{ voiceOn = false; voiceRec = null; voiceUi(false); };
+  try{ rec.start(); voiceOn = true; voiceUi(true); }
+  catch(e){ voiceRec = null; toast('语音输入启动失败，请再试一次'); }
 }
 /* 对话上下文（v1.3）：记住最近聊到的商品，「那它的压缩机呢」这类追问能接住 */
 let chatCtxPid = null;
@@ -2857,6 +3030,11 @@ function downscaleImage(file){
 /* ================= 初始化 ================= */
 syncReminders();
 renderAll();
+initVoiceBtn();
+try{
+  if(window.visualViewport && window.visualViewport.addEventListener) window.visualViewport.addEventListener('resize', fitChatHeight);
+  if(window.addEventListener) window.addEventListener('resize', fitChatHeight);
+}catch(e){}
 startupStorageAudit(); /* v1.5 引用存在性校验 + V2.3 内容哈希复验与孤儿清理：失效即打标重渲染，孤儿即清 */
 if(!store.chat.length){
   botSay('你好，我是家庭保修管家。\n你把家电的订单、发票或保修卡拍给我，我帮你建保修档案；东西坏了先问我——还在不在保、依据是什么、下一步该干什么，我都会给你一张说得清的「保修结论卡」。\n第一次用可以先在档案页点「载入演示数据」，或直接点下方「拍凭证建档」试试。');
