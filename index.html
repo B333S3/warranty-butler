@@ -1326,7 +1326,13 @@ const LS_KEY = 'warrantyButler.v1';
 const LS_BAK_KEY = 'warrantyButler.v1.bak';
 function emptyStore(){ return { products:[], repairs:[], reminders:[], policyChecks:[], replacements:[], partEvents:[], chat:[] }; }
 function lsGet(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } }
-function parseStoreJSON(raw){ if(!raw) return null; try{ const s = JSON.parse(raw); if(s && s.products) return s; }catch(e){} return null; }
+function parseStoreJSON(raw){ if(!raw) return null; try{ const s = JSON.parse(raw);
+  /* 2026-11-27 最终轮深挖：JSON 合法但形状被写坏（products 非数组等）时旧实现照单全收，
+     首屏渲染 forEach 直接抛错白屏且每次重载必复现。形状不对整份判损坏 → 走备份/空库回退；
+     七个集合键逐个归一化为数组，单键损坏不连累其余数据。 */
+  if(!s || !Array.isArray(s.products)) return null;
+  ['repairs','reminders','policyChecks','replacements','partEvents','chat'].forEach(k=>{ if(!Array.isArray(s[k])) s[k] = []; });
+  return s; }catch(e){} return null; }
 function loadStore(){
   const main = parseStoreJSON(lsGet(LS_KEY));
   if(main) return main;
