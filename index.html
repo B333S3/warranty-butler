@@ -649,20 +649,47 @@ table.kv td{padding:9px 6px; border-bottom:1px solid var(--line);}
 
 /* ---------- V2.3 对话页布局修复＋语音输入（杨宇真机报障：空态时输入框悬在页面中部） ----------
    对话视图改纵向弹性布局：消息区占满剩余高度独立滚动，快捷问与输入框恒贴视图底部；
-   视图高度按断点扣除顶栏/底栏占用，键盘弹起时由 fitChatHeight() 按 visualViewport 动态收紧。
-   main 底内边距在对话页让位（:has），避免整页多出一截可滚空白。只动布局，不动配色与视觉。 */
-#view-chat.active{display:flex; flex-direction:column; height:calc(100dvh - 133px);}
+   main 底内边距在对话页让位（:has），避免整页多出一截可滚空白。只动布局，不动配色与视觉。
+   【V2.4 结构性重做（2026-11-27 深夜，见下方 chat-on 壳锁）：本节原「100dvh 减魔法常数」算高
+   已整体拆除——高度改由弹性壳分配，此处只保留消息区/快捷问/输入框的弹性子项规则。】 */
+#view-chat.active{display:flex; flex-direction:column;}
 main:has(> #view-chat.active){padding-bottom:0;}
 #view-chat #chatLog{flex:1 1 auto; min-height:0; overflow-y:auto; overscroll-behavior:contain;
   -webkit-overflow-scrolling:touch; scrollbar-width:thin;}
 #view-chat .chips{flex:none;}
 #view-chat .chat-input{position:relative; bottom:auto; flex:none; margin-bottom:12px;}
 @media (max-width:760px){
-  #view-chat.active{height:calc(100dvh - 136px - env(safe-area-inset-bottom));}
   #view-chat .chat-input{margin-bottom:8px;}
 }
+/* ---------- V2.4 对话页壳锁（2026-11-27 深夜，杨宇真机报障：长结论卡把输入框顶到屏外，
+   手拖上来一松手又弹回去） ----------
+   定性：V2.3 的高度靠「100dvh − 133/136/72px 魔法常数」起算、再由 fitChatHeight 按
+   visualViewport 逐像素修正；且对话页里窗口与消息区两个滚动通道并存，renderChat 每次
+   还 jumpTo 把窗口拉到底。模拟器（Chromium/WebKit）里 vv 恒等于 innerHeight、常数恰好
+   吻合，所以历轮锁底测试全绿；真机 iOS 上工具栏伸缩反复触发 vv resize 改高、窗口滚动
+   与内滚互相抢手势、程序化拉窗与用户拖动打架——滚动位置守不住、输入框被顶出屏。
+   改法（结构性）：切到对话页即给 body 加 chat-on——整个应用变 100dvh 纵向弹性壳：
+   body overflow:hidden 文档永不滚动；顶栏/标签栏 flex:none；main flex:1 min-height:0；
+   对话视图 flex:1；消息区独立内滚；输入框是流内最后一项，几何上不可能被顶出屏幕。
+   全程零高度运算；键盘弹起时 fitChatHeight 只把 body 高度同步为 vv 高度，flex 自动再分配。 */
+body.chat-on{height:100dvh; overflow:hidden; overscroll-behavior:none;}
+@media (max-width:1199.98px){
+  /* 单列壳（手机/平板）：body 转纵向弹性列，顶栏/标签栏定高，main 吃掉剩余高度 */
+  body.chat-on{display:flex; flex-direction:column;}
+  body.chat-on header.site, body.chat-on nav.tabs{flex:none;}
+  body.chat-on main{flex:1 1 auto; min-height:0; display:flex; flex-direction:column; padding-bottom:0;}
+}
 @media (min-width:1200px){
-  #view-chat.active{height:calc(100dvh - 72px);}
+  /* 桌面壳是 Grid（顶栏通栏＋216px 左侧栏＋main），壳型不动：仅锁高禁滚，
+     main 在自己的网格行内转弹性列（行高即 100dvh−顶栏，由网格分配，同样零运算） */
+  body.chat-on main{min-height:0; display:flex; flex-direction:column;}
+}
+body.chat-on #view-chat.active{flex:1 1 auto; min-height:0;}
+/* 移动端标签栏是 position:fixed 底部悬浮（V2.1），不在弹性流内——壳底须给它让出自身高度
+   （56 按钮＋上下内边距 8＋顶边线 1＝65px，另加安全区），否则输入框会沉到标签栏底下。
+   这是给固定兄弟元素让位，与旧版 main 底内边距 136px 同性质，不是视口高度运算。 */
+@media (max-width:760px){
+  body.chat-on main:has(> #view-chat.active){padding-bottom:calc(65px + env(safe-area-inset-bottom));}
 }
 /* 输入框左内边距让位麦克风按钮：按钮隐藏时文字起点与旧版一致（5+11=16px） */
 .chat-input{padding-left:5px;}
@@ -1650,21 +1677,16 @@ function jumpTo(y){
   window.scrollTo(0, y);
   de.style.scrollBehavior = prev;
 }
-/* 对话页高度贴合：视图高度 = 可视区高度 − 视图顶端占用 − 底部固定标签栏高度。
-   CSS 的 dvh 计算是静态基线；键盘弹起时 visualViewport 变小，本函数同步收紧高度，
-   输入框始终贴在可视区底部、标签栏上方（桌面/平板标签栏不在底部，reserve 为 0）。 */
+/* V2.4：对话页高度不再逐像素算视图——body.chat-on 弹性壳负责布局（见 CSS 壳锁）。
+   本函数只剩一个职责：键盘弹起/收起使 visualViewport 高度变化时，把 body 高度同步过去，
+   flex 自动再分配、输入框随壳底走；离开对话页（无 chat-on）时清掉内联高度、恢复文档流。 */
 function fitChatHeight(){
   try{
+    if(!document.body.classList.contains('chat-on')){ document.body.style.height = ''; return; }
     const vv = window.visualViewport;
     if(!vv) return;
-    const v = document.getElementById('view-chat');
-    if(!v || !v.classList.contains('active')) return;
-    const tabs = document.querySelector('nav.tabs');
-    let reserve = 0;
-    if(tabs && getComputedStyle(tabs).position === 'fixed') reserve = tabs.getBoundingClientRect().height;
-    const topInView = v.getBoundingClientRect().top - (vv.offsetTop || 0);
-    const h = Math.round(vv.height - topInView - reserve);
-    if(h > 240) v.style.height = h + 'px';
+    const h = Math.round(vv.height);
+    if(h > 240) document.body.style.height = h + 'px';
   }catch(e){}
 }
 const scrollMem = {};
@@ -1677,12 +1699,14 @@ function switchView(v){
     tab.classList.toggle('active', x===v);
     tab.setAttribute('aria-selected', x===v ? 'true' : 'false');
   });
+  document.body.classList.toggle('chat-on', v==='chat'); /* V2.4 壳锁：对话页锁定文档滚动，非对话页恢复文档流 */
   if(v==='home') renderHome();
   if(v==='archive'){ document.getElementById('archiveListWrap').style.display=''; document.getElementById('archiveDetailWrap').style.display='none'; renderList(); }
   if(v==='reminders') renderReminders();
   curView = v;
   jumpTo(scrollMem[v] || 0);
-  if(v==='chat'){ fitChatHeight(); setTimeout(fitChatHeight, 280); /* viewIn 动画（translateY 5px）结束后再贴合一次，消除测高偏移 */ }
+  if(v==='chat'){ fitChatHeight(); setTimeout(fitChatHeight, 280); /* 进场后再同步一次 body 高度（vv 基线对齐） */ }
+  else fitChatHeight(); /* 离开对话页：清掉 body 内联高度 */
 }
 function renderAll(){ renderHome(); renderList(); renderReminders(); updateBadge(); renderChips(); syncDemoToggle(); }
 function goDetail(pid){ switchView('archive'); openDetail(pid); }
@@ -2721,7 +2745,8 @@ function renderChat(){
   }).join('');
   fixCcTlLabels(el);
   el.scrollTop = el.scrollHeight;
-  if(curView==='chat') jumpTo(document.body.scrollHeight); /* 仅对话页在前台时才把窗口拉到底；初始化在首页调用时不许劫持首页滚动 */
+  /* V2.4：不再 jumpTo 拉窗口——对话页 body 已上锁、文档永不滚动，消息区内滚到底即可；
+     旧写法在真机上与用户拖动互相打架（松手回弹的元凶之一）。 */
 }
 function botSay(text, html){ pushMsg('bot', text, html); }
 function findProduct(text){
