@@ -1750,6 +1750,21 @@ function syncKbState(){
     document.body.classList.toggle('kb-open', !!(on && focused && kbBaseH - h > 80));
   }catch(e){}
 }
+/* V2.7 刷新/切入对话滚底（2026-11-28 杨宇真机报障：对话已有历史时，刷新网页再进对话页，
+   消息列表停在最上面第一条，而不是落在最新消息处；消息持久化恢复正常，只是滚动位置不对）。
+   根因：初始视图是首页、#view-chat 为 display:none，初始化末尾 renderChat() 里的
+   scrollTop=scrollHeight 在无布局时赋值无效；而 switchView('chat') 此前只做壳高/平移同步、
+   从不滚 chatLog，新获得布局的滚动容器 scrollTop 默认 0 → 停在顶部。
+   修法（只动切入时点，不挂持续监听）：进入 chat 时壳同步后立即滚底，280ms 收尾同步时再滚
+   一次——壳高（body 内联高度→flex 分配）在真机上可能晚定型，最大可滚量随 clientHeight 变，
+   先滚的值会被钳制偏小，收尾一滚才落得实。用户进入后手动上滑看历史不受影响（无任何
+   持续钉底逻辑）；键盘态、流式输出的滚底仍走原有 renderChat/kbSyncBurst 路径，互不干扰。 */
+function scrollChatToBottom(){
+  try{
+    const el = document.getElementById('chatLog');
+    if(el) el.scrollTop = el.scrollHeight;
+  }catch(e){}
+}
 const scrollMem = {};
 let curView = 'home';
 function switchView(v){
@@ -1767,7 +1782,7 @@ function switchView(v){
   if(v==='reminders') renderReminders();
   curView = v;
   jumpTo(scrollMem[v] || 0);
-  if(v==='chat'){ syncChatShell(); setTimeout(syncChatShell, 280); /* 进场后再同步一次（高度＋平移钉住，vv 基线对齐） */ }
+  if(v==='chat'){ syncChatShell(); scrollChatToBottom(); setTimeout(()=>{ syncChatShell(); scrollChatToBottom(); }, 280); /* 进场后再同步一次（高度＋平移钉住，vv 基线对齐）＋V2.7 滚底收尾 */ }
   else fitChatHeight(); /* 离开对话页：清掉 body 内联高度 */
 }
 function renderAll(){ renderHome(); renderList(); renderReminders(); updateBadge(); renderChips(); syncDemoToggle(); }
