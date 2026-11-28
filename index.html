@@ -774,7 +774,7 @@ body{overflow-x:clip; touch-action:pan-y pinch-zoom;}
       <h1>家庭保修管家</h1>
       <p>家庭售后决策助手</p>
     </div>
-    <span class="brand-ver">V2.2 · 规则 v1.5</span>
+    <span class="brand-ver">V2.9 · 规则 v1.5</span>
     <button class="set-btn" onclick="openSettings()" aria-label="AI 设置"><svg class="ic"><use href="#i-gear"/></svg></button>
   </div>
 </header>
@@ -1625,13 +1625,15 @@ const DEMO_PHOTOS = {
 function demoPhotoOf(p){ return (p && p.demo && DEMO_PHOTOS[p.id]) ? DEMO_PHOTOS[p.id] : ''; }
 
 /* ---------- 演示数据（全部标注 demo:true，界面带「演示数据」标签） ---------- */
+/* V2.9（2026-11-28，杨宇拍板）：电饭煲购买日 2025-12-05 → 2025-12-20（到期 2026-12-20，序列号日期段同步），
+   使评审周 2026-12-07 ~ 12-15 全程稳在「临近到期」（剩余 13 → 5 天），其余演示数据不动。 */
 function demoData(){
   const P = (o)=>Object.assign({extended_months:0, correction_log:[], demo:true}, o);
   const products = [
     P({id:'demo-fridge', name:'海尔双门冰箱', brand:'海尔', model:'BCD-470WDPG', serial_no:'HR202103150088', category:'大家电', purchase_date:'2021-03-15', start_basis:'购买日', price:5999, channel:'京东', seller:'海尔京东自营旗舰店', invoice_no:'', warranty_months_whole:36, warranty_months_parts:120, warranty_source:'凭证', evidence_desc:'保修卡照片（演示凭证）', source:'凭证识别'}),
     P({id:'demo-ac', name:'美的变频空调', brand:'美的', model:'KFR-35GW/N8HE1', serial_no:'MD202506200312', category:'大家电', purchase_date:'2025-06-20', start_basis:'购买日', price:3299, channel:'天猫', seller:'美的官方旗舰店', invoice_no:'044002100311', warranty_months_whole:72, warranty_months_parts:72, warranty_source:'品牌政策', evidence_desc:'电商订单截图（演示凭证）', source:'凭证识别'}),
     P({id:'demo-tv', name:'小米电视 65 英寸', brand:'小米', model:'EA65 2022款', serial_no:'', category:'大家电', purchase_date:'2025-11-10', start_basis:'购买日', price:2199, channel:'小米商城', seller:'小米官方', invoice_no:'', warranty_months_whole:36, warranty_months_parts:36, warranty_source:'用户填写', evidence_desc:'', source:'对话录入'}),
-    P({id:'demo-cooker', name:'格力电饭煲', brand:'格力', model:'GDF-4019', serial_no:'GL202512050077', category:'厨电', purchase_date:'2025-12-05', start_basis:'购买日', price:399, channel:'拼多多', seller:'格力官方旗舰店', invoice_no:'', warranty_months_whole:12, warranty_months_parts:'', warranty_source:'凭证', evidence_desc:'电商订单截图（演示凭证）', source:'凭证识别'}),
+    P({id:'demo-cooker', name:'格力电饭煲', brand:'格力', model:'GDF-4019', serial_no:'GL202512200077', category:'厨电', purchase_date:'2025-12-20', start_basis:'购买日', price:399, channel:'拼多多', seller:'格力官方旗舰店', invoice_no:'', warranty_months_whole:12, warranty_months_parts:'', warranty_source:'凭证', evidence_desc:'电商订单截图（演示凭证）', source:'凭证识别'}),
     P({id:'demo-phone', name:'华为手机', brand:'华为', model:'Mate 系列（型号待补）', serial_no:'', category:'手机数码', purchase_date:'2026-08-01', start_basis:'购买日', price:4999, channel:'线下门店', seller:'华为授权体验店', invoice_no:'', warranty_months_whole:12, warranty_months_parts:'', warranty_source:'品类估算', evidence_desc:'', source:'手动表单'}),
     P({id:'demo-dyson', name:'戴森吸尘器', brand:'戴森', model:'V11', serial_no:'', category:'小家电', purchase_date:'', start_basis:'购买日', price:'', channel:'', seller:'', invoice_no:'', warranty_months_whole:'', warranty_months_parts:'', warranty_source:'用户填写', evidence_desc:'', source:'手动表单'})
   ];
