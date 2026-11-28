@@ -1381,6 +1381,19 @@ function loadStore(){
   return emptyStore();
 }
 let store = loadStore();
+/* 深挖 V2.8（2026-11-28 提报前查杀）：AI 等待占位（typing 气泡）只许活在本窗口内存里。
+   sendChat 把它随 save() 落了盘：用户在回复到达前刷新/关页，占位会被当作历史消息读回，
+   渲染成永远转圈的幽灵气泡（探针 X1/X6 实测复现）。加载时剔除并回写干净数据；
+   本窗口正在等待的占位不受影响（回复到达后按对象引用替换）。 */
+function isTypingGhost(m){ return !!(m && m.role==='bot' && !m.text && typeof m.html==='string' && m.html.indexOf('class="typing"')>=0); }
+(function stripPersistedTyping(){
+  try{
+    if(store.chat.some(isTypingGhost)){
+      store.chat = store.chat.filter(m=> !isTypingGhost(m));
+      localStorage.setItem(LS_KEY, JSON.stringify(store));
+    }
+  }catch(e){}
+})();
 /* 本窗口最后一次读到/写出的主数据原文。save() 拿它与当前盘上值比对：不一致 = 另一窗口写过盘，
    直接整库覆盖会吞掉对方的数据，必须先三方合并（mergeStoreStates）再写。 */
 let lastPersistedJSON = lsGet(LS_KEY);
@@ -1420,6 +1433,8 @@ if(typeof window !== 'undefined' && typeof window.addEventListener === 'function
       if(JSON.stringify(store) === cur){ lastPersistedJSON = cur; return; }
       const theirs = parseStoreJSON(cur); if(!theirs) return;
       store = mergeStoreStates(parseStoreJSON(lastPersistedJSON) || emptyStore(), store, theirs);
+      /* V2.8：另一窗口落盘的等待占位不许经合并通道在本窗口复活成幽灵气泡 */
+      if(store.chat.some(isTypingGhost)) store.chat = store.chat.filter(m=> !isTypingGhost(m));
       const out = JSON.stringify(store);
       lastPersistedJSON = out;
       if(out !== cur){ try{ localStorage.setItem(LS_KEY, out); }catch(_){ } }
@@ -2993,21 +3008,34 @@ function arkContentOf(data){
   if(!content) throw new Error('模型返回为空');
   return content;
 }
+/* 深挖 V2.8：AI 通道 fetch 此前无超时——代理接受连接却不响应（或网络半死）时，
+   等待气泡无限转圈、永不回落本地规则（探针 X4 实测 15 秒仍无收尾）。统一超时：
+   纯文本 30 秒、带图识别 60 秒；超时按通道失败抛错并带人话提示，调用方原有回落接管。 */
+async function fetchAi(url, opts, timeoutMs){
+  const ctl = new AbortController();
+  const tid = setTimeout(()=> ctl.abort(), timeoutMs);
+  try{ return await fetch(url, Object.assign({}, opts, { signal: ctl.signal })); }
+  catch(e){
+    if(e && e.name==='AbortError'){ const err = new Error('AI 响应超时'); err.userMessage = 'AI 响应超时了，已切换本地规则模式为你解答。'; err.timedOut = true; throw err; }
+    throw e;
+  } finally{ clearTimeout(tid); }
+}
 async function arkChat(messages, maxTokens){
   const s = aiSettings();
+  const hasImage = messages.some(m=> Array.isArray(m.content) && m.content.some(part=> part && part.type==='image_url'));
+  const timeoutMs = hasImage ? 60000 : 30000;
   if(s.key && s.endpoint){
     /* 高级选项：用户自填 Key 直连火山方舟 */
-    const resp = await fetch(ARK_URL, { method:'POST',
+    const resp = await fetchAi(ARK_URL, { method:'POST',
       headers:{'Content-Type':'application/json','Authorization':'Bearer '+s.key},
-      body: JSON.stringify({ model:s.endpoint, messages, max_tokens:maxTokens||800, temperature:0.3, thinking:{type:'disabled'} }) });
+      body: JSON.stringify({ model:s.endpoint, messages, max_tokens:maxTokens||800, temperature:0.3, thinking:{type:'disabled'} }) }, timeoutMs);
     if(!resp.ok) throw new Error('火山方舟接口返回 HTTP '+resp.status);
     return arkContentOf(await resp.json());
   }
   /* 默认通道：内置 AI 代理——不带 Authorization 头；带图走识别口、纯文本走对话口（代理协议） */
-  const hasImage = messages.some(m=> Array.isArray(m.content) && m.content.some(part=> part && part.type==='image_url'));
-  const resp = await fetch(PROXY_BASE + (hasImage ? '/wb/recognize' : '/wb/chat'), { method:'POST',
+  const resp = await fetchAi(PROXY_BASE + (hasImage ? '/wb/recognize' : '/wb/chat'), { method:'POST',
     headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({ model:PROXY_MODEL, messages, max_tokens:maxTokens||800, temperature:0.3, thinking:{type:'disabled'} }) });
+    body: JSON.stringify({ model:PROXY_MODEL, messages, max_tokens:maxTokens||800, temperature:0.3, thinking:{type:'disabled'} }) }, timeoutMs);
   if(!resp.ok){
     let serverMsg = '';
     try{ const j = await resp.json(); if(j && j.message) serverMsg = String(j.message); }catch(e){}
