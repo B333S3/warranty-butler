@@ -691,6 +691,18 @@ body.chat-on #view-chat.active{flex:1 1 auto; min-height:0;}
 @media (max-width:760px){
   body.chat-on main:has(> #view-chat.active){padding-bottom:calc(65px + env(safe-area-inset-bottom));}
 }
+/* ---------- V2.6 键盘态回收标签栏让位（2026-11-28 杨宇真机截图：V2.5 后输入框不再被顶飞，
+   但键盘弹起时输入框底边与键盘顶边之间还隔着一条约一个标签栏高的空白带） ----------
+   定性：键盘态下 body 高已同步 vv 高度，但 main 仍留着给 fixed 标签栏让位的底内边距
+   （65px＋安全区），而标签栏此时被键盘盖住/推出可视区——让位留着、人已不在，空白带由此而来。
+   改法：键盘打开（body.kb-open，由 syncKbState 按「输入框聚焦＋vv 相对全高基线收缩 >80px」
+   判定）时，移动端隐藏标签栏、回收 main 让位内边距、输入框底外边距归零，输入框底边贴齐
+   壳底（即紧贴键盘上方）；键盘收起类名移除，布局像素级恢复 V2.5 现状。只动布局结构。 */
+@media (max-width:760px){
+  body.chat-on.kb-open nav.tabs{display:none;}
+  body.chat-on.kb-open main:has(> #view-chat.active){padding-bottom:0;}
+  body.chat-on.kb-open #view-chat .chat-input{margin-bottom:0;}
+}
 /* 输入框左内边距让位麦克风按钮：按钮隐藏时文字起点与旧版一致（5+11=16px） */
 .chat-input{padding-left:5px;}
 .chat-input input{padding-left:11px;}
@@ -1714,11 +1726,29 @@ function pinChatScroll(){
     chatPinBusy = false;
   }catch(e){ chatPinBusy = false; }
 }
-function syncChatShell(){ fitChatHeight(); pinChatScroll(); }
+function syncChatShell(){ fitChatHeight(); pinChatScroll(); syncKbState(); }
 function kbSyncBurst(){
   syncChatShell();
   if(window.requestAnimationFrame) requestAnimationFrame(()=>{ syncChatShell(); requestAnimationFrame(syncChatShell); });
   [60, 180, 320, 480].forEach(ms=> setTimeout(syncChatShell, ms));
+}
+/* V2.6 键盘开合状态判定（2026-11-28 杨宇真机截图：键盘弹起时输入框与键盘之间隔着一条
+   约标签栏高的空白带——标签栏被键盘盖住，但 main 给它让位的底内边距还在）。
+   kbBaseH 记键盘收起时的 vv 全高基线：未收缩（与基线差 ≤80px）时持续刷新基线；
+   输入框聚焦且 vv 相对基线收缩 >80px 即判键盘打开，给 body 加 kb-open，CSS 据此隐藏
+   标签栏、回收让位（见样式区 V2.6）。本函数挂在 syncChatShell 末尾，高度同步走到哪它跟
+   到哪；blur 后聚焦条件消失、高度恢复，类名自动移除，布局像素级回到 V2.5。 */
+let kbBaseH = 0;
+function syncKbState(){
+  try{
+    const on = document.body.classList.contains('chat-on');
+    const vv = window.visualViewport;
+    const h = vv ? Math.round(vv.height) : window.innerHeight;
+    if(on && kbBaseH - h <= 80) kbBaseH = Math.max(kbBaseH, h); /* 未收缩：刷新全高基线 */
+    const el = document.getElementById('chatText');
+    const focused = !!el && document.activeElement === el;
+    document.body.classList.toggle('kb-open', !!(on && focused && kbBaseH - h > 80));
+  }catch(e){}
 }
 const scrollMem = {};
 let curView = 'home';
@@ -1731,6 +1761,7 @@ function switchView(v){
     tab.setAttribute('aria-selected', x===v ? 'true' : 'false');
   });
   document.body.classList.toggle('chat-on', v==='chat'); /* V2.4 壳锁：对话页锁定文档滚动，非对话页恢复文档流 */
+  if(v!=='chat') document.body.classList.remove('kb-open'); /* V2.6：离开对话页键盘态类名不残留 */
   if(v==='home') renderHome();
   if(v==='archive'){ document.getElementById('archiveListWrap').style.display=''; document.getElementById('archiveDetailWrap').style.display='none'; renderList(); }
   if(v==='reminders') renderReminders();
