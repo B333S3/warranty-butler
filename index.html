@@ -1689,6 +1689,37 @@ function fitChatHeight(){
     if(h > 240) document.body.style.height = h + 'px';
   }catch(e){}
 }
+/* V2.5 键盘平移钉住（2026-11-28 杨宇真机录屏报障：对话页点输入框、键盘弹起的一瞬间，
+   输入框被一下顶出可视区没影，画面只剩白色空白＋贴在键盘上方的底部标签栏，消息区也看不见；
+   他还没输入、没发送）。根因：iOS Safari 聚焦输入框时先做 scroll-into-view——按「布局视口」
+   坐标把可视视口（visualViewport）整体向下平移（offsetTop 增大、window.scrollY 被带起来），
+   赶在 vv resize 到达之前就把壳顶出可视区；其后 fitChatHeight 虽把 body 高度同步成 vv 高度，
+   但平移量从没人清零：可视区落在 [offsetTop, offsetTop+vv.height]，而壳只占 [0, vv.height]，
+   露出的正是 body 之下的空白（html 白底），固定标签栏则按可视视口贴底——与录屏逐项吻合。
+   V2.4 只监听 vv resize、只同步高度，没监听 vv scroll、没处理聚焦时刻，正是这条路径的盲区。
+   修法（只动滚动/定位结构，视觉零改动）：
+   ① pinChatScroll：chat-on 期间只要 window 被平移（scrollY≠0）就瞬时钉回 0——壳高已同步为
+      vv 高度、输入框本就在可视区底部，钉回后 iOS 无需再平移，状态自洽不反复；
+   ② syncChatShell＝高度同步＋钉住，挂到 vv 的 resize 与 scroll 双事件、window resize/scroll；
+   ③ 输入框 focus/blur 时触发 kbSyncBurst：立即＋rAF×2＋60/180/320/480ms 多次同步，
+      覆盖键盘动画全程（iOS 的 resize 事件常在动画末尾才到，scroll 与聚焦时刻必须先顶住）。 */
+let chatPinBusy = false;
+function pinChatScroll(){
+  if(chatPinBusy) return;
+  try{
+    if(!document.body.classList.contains('chat-on')) return;
+    if(window.scrollY === 0) return;
+    chatPinBusy = true;
+    jumpTo(0);
+    chatPinBusy = false;
+  }catch(e){ chatPinBusy = false; }
+}
+function syncChatShell(){ fitChatHeight(); pinChatScroll(); }
+function kbSyncBurst(){
+  syncChatShell();
+  if(window.requestAnimationFrame) requestAnimationFrame(()=>{ syncChatShell(); requestAnimationFrame(syncChatShell); });
+  [60, 180, 320, 480].forEach(ms=> setTimeout(syncChatShell, ms));
+}
 const scrollMem = {};
 let curView = 'home';
 function switchView(v){
@@ -1705,7 +1736,7 @@ function switchView(v){
   if(v==='reminders') renderReminders();
   curView = v;
   jumpTo(scrollMem[v] || 0);
-  if(v==='chat'){ fitChatHeight(); setTimeout(fitChatHeight, 280); /* 进场后再同步一次 body 高度（vv 基线对齐） */ }
+  if(v==='chat'){ syncChatShell(); setTimeout(syncChatShell, 280); /* 进场后再同步一次（高度＋平移钉住，vv 基线对齐） */ }
   else fitChatHeight(); /* 离开对话页：清掉 body 内联高度 */
 }
 function renderAll(){ renderHome(); renderList(); renderReminders(); updateBadge(); renderChips(); syncDemoToggle(); }
@@ -3063,8 +3094,19 @@ syncReminders();
 renderAll();
 initVoiceBtn();
 try{
-  if(window.visualViewport && window.visualViewport.addEventListener) window.visualViewport.addEventListener('resize', fitChatHeight);
-  if(window.addEventListener) window.addEventListener('resize', fitChatHeight);
+  if(window.visualViewport && window.visualViewport.addEventListener){
+    window.visualViewport.addEventListener('resize', syncChatShell);
+    window.visualViewport.addEventListener('scroll', syncChatShell); /* V2.5：iOS 聚焦平移走 vv scroll，必须同帧钉住 */
+  }
+  if(window.addEventListener){
+    window.addEventListener('resize', syncChatShell);
+    window.addEventListener('scroll', pinChatScroll, { passive:true }); /* V2.5：chat-on 期间窗口平移即钉回 */
+  }
+  const chatTextEl = document.getElementById('chatText');
+  if(chatTextEl){
+    chatTextEl.addEventListener('focus', kbSyncBurst); /* V2.5：键盘弹起全程覆盖 */
+    chatTextEl.addEventListener('blur', kbSyncBurst);  /* 键盘收起同样要把高度/平移同步回来 */
+  }
 }catch(e){}
 startupStorageAudit(); /* v1.5 引用存在性校验 + V2.3 内容哈希复验与孤儿清理：失效即打标重渲染，孤儿即清 */
 if(!store.chat.length){
